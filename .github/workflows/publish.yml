@@ -1,0 +1,49 @@
+name: publish
+
+on:
+  push:
+    branches:
+      - "*"
+  # schedule:
+  #   - cron: '* * 1/4 * *'
+
+jobs:
+  publish:
+    strategy:
+      matrix:
+        go-version: [1.13.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - 
+        uses: actions/checkout@master
+        with:
+          repository: rakyll/hey
+          fetch-depth: 1
+      -
+        name: Fetch tags from upstream
+        run: git fetch --tags
+      - 
+        name: Get latest tags
+        id: get_tag
+        run: echo ::set-output name=TAG::$(git describe --tags `git rev-list --tags --max-count=1`)
+      -
+        name: Generate Binaries
+        run: make release
+      -
+        name: Create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_tag.outputs.TAG }}
+          draft: false
+          prerelease: false
+      -
+        name: Upload Binaries
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/
